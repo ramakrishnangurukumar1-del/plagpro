@@ -21,3 +21,26 @@ export function getFacultyDocuments() {
 export function getFacultyStats() {
   return client.get('/api/faculty/stats').then((r) => r.data);
 }
+
+export function getDocumentFileUrl(id) {
+  return client.get(`/api/documents/${id}/file`, { responseType: 'blob' }).then((r) => {
+    const contentType = r.headers['content-type'] || 'application/octet-stream';
+    const blob = new Blob([r.data], { type: contentType });
+    return { url: URL.createObjectURL(blob), contentType };
+  });
+}
+
+export async function getReportPdfBlobUrl(id) {
+  const r = await client.get(`/api/documents/${id}/report`, { responseType: 'blob' });
+  const blob = new Blob([r.data], { type: 'application/pdf' });
+  return URL.createObjectURL(blob);
+}
+
+export async function downloadReportPdf(id, filename) {
+  const url = await getReportPdfBlobUrl(id);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'report.pdf';
+  a.click();
+  URL.revokeObjectURL(url);
+}

@@ -127,7 +127,7 @@ public class DocumentService {
         return documentRepository.findAllByOrderByUploadedAtDesc().stream().map(this::toSummary).toList();
     }
 
-    public AnalysisResultDto getResult(Long documentId, User requester) {
+    public Document getAuthorizedDocument(Long documentId, User requester) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
 
@@ -136,6 +136,11 @@ public class DocumentService {
         if (!isOwner && !isFacultyOrAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your document");
         }
+        return document;
+    }
+
+    public AnalysisResultDto getResult(Long documentId, User requester) {
+        Document document = getAuthorizedDocument(documentId, requester);
 
         AnalysisResult result = analysisResultRepository.findByDocument(document).orElse(null);
         if (result == null) {

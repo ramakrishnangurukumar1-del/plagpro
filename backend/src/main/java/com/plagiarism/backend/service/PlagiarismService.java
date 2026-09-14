@@ -72,8 +72,10 @@ public class PlagiarismService {
             JsonNode root = mapper.readTree(json);
             JsonNode hits = root.path("query").path("search");
             if (!hits.isArray() || hits.isEmpty()) return null;
+            String title = hits.get(0).path("title").asText("");
             String snippet = hits.get(0).path("snippet").asText("").replaceAll("<[^>]+>", "");
-            return new SourceMatchDto("Wikipedia", round(overlapPercent(docWords, significantWords(snippet))));
+            String url = "https://en.wikipedia.org/wiki/" + java.net.URLEncoder.encode(title.replace(' ', '_'), java.nio.charset.StandardCharsets.UTF_8);
+            return new SourceMatchDto("Wikipedia", round(overlapPercent(docWords, significantWords(snippet))), url);
         } catch (Exception e) {
             return null;
         }
@@ -84,11 +86,14 @@ public class PlagiarismService {
             String json = restClient.get()
                     .uri("https://api.crossref.org/works?rows=1&query={q}", query)
                     .retrieve().body(String.class);
-            JsonNode items = mapper.readTree(json).path("message").path("items");
-            if (!items.isArray() || items.isEmpty()) return null;
-            String title = items.get(0).path("title").isArray() && items.get(0).path("title").size() > 0
-                    ? items.get(0).path("title").get(0).asText("") : "";
-            return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, significantWords(title))));
+            JsonNode item = mapper.readTree(json).path("message").path("items");
+            if (!item.isArray() || item.isEmpty()) return null;
+            JsonNode first = item.get(0);
+            String title = first.path("title").isArray() && first.path("title").size() > 0
+                    ? first.path("title").get(0).asText("") : "";
+            String doi = first.path("DOI").asText("");
+            String url = doi.isBlank() ? first.path("URL").asText("") : "https://doi.org/" + doi;
+            return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, significantWords(title))), url);
         } catch (Exception e) {
             return null;
         }
@@ -101,8 +106,10 @@ public class PlagiarismService {
                     .retrieve().body(String.class);
             JsonNode results = mapper.readTree(json).path("results");
             if (!results.isArray() || results.isEmpty()) return null;
-            String title = results.get(0).path("title").asText("");
-            return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, significantWords(title))));
+            JsonNode first = results.get(0);
+            String title = first.path("title").asText("");
+            String url = first.path("doi").asText(first.path("id").asText(""));
+            return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, significantWords(title))), url);
         } catch (Exception e) {
             return null;
         }
@@ -114,10 +121,12 @@ public class PlagiarismService {
                     .uri("https://export.arxiv.org/api/query?search_query=all:{q}&max_results=1", query)
                     .retrieve().body(String.class);
             if (xml == null) return null;
-            java.util.regex.Matcher m = Pattern.compile("<summary>(.*?)</summary>", Pattern.DOTALL).matcher(xml);
-            if (!m.find()) return null;
-            String summary = m.group(1);
-            return new SourceMatchDto("arXiv", round(overlapPercent(docWords, significantWords(summary))));
+            java.util.regex.Matcher summaryMatcher = Pattern.compile("<summary>(.*?)</summary>", Pattern.DOTALL).matcher(xml);
+            if (!summaryMatcher.find()) return null;
+            String summary = summaryMatcher.group(1);
+            java.util.regex.Matcher idMatcher = Pattern.compile("<id>(.*?)</id>", Pattern.DOTALL).matcher(xml);
+            String url = idMatcher.find() ? idMatcher.group(1).trim() : "";
+            return new SourceMatchDto("arXiv", round(overlapPercent(docWords, significantWords(summary))), url);
         } catch (Exception e) {
             return null;
         }
@@ -126,12 +135,14 @@ public class PlagiarismService {
     private SourceMatchDto checkSemanticScholar(String query, Set<String> docWords) {
         try {
             String json = restClient.get()
-                    .uri("https://api.semanticscholar.org/graph/v1/paper/search?limit=1&query={q}", query)
+                    .uri("https://api.semanticscholar.org/graph/v1/paper/search?limit=1&fields=title,url&query={q}", query)
                     .retrieve().body(String.class);
             JsonNode data = mapper.readTree(json).path("data");
             if (!data.isArray() || data.isEmpty()) return null;
-            String title = data.get(0).path("title").asText("");
-            return new SourceMatchDto("Semantic Scholar", round(overlapPercent(docWords, significantWords(title))));
+            JsonNode first = data.get(0);
+            String title = first.path("title").asText("");
+            String url = first.path("url").asText("");
+            return new SourceMatchDto("Semantic Scholar", round(overlapPercent(docWords, significantWords(title))), url);
         } catch (Exception e) {
             return null;
         }
