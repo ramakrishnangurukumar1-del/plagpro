@@ -1,37 +1,74 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CheckCircle2, Loader2, Circle, FileText } from 'lucide-react';
+import { CheckCircle2, Loader2, Circle, FileText, AlertTriangle } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
-import { currentUser, processingSteps } from '../mock/data';
+import { getDocumentResult } from '../api/documents';
+import { processingSteps } from '../mock/data';
 
 export default function Processing() {
-  const [stepIndex, setStepIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(8);
+  const [status, setStatus] = useState('QUEUED');
+  const [filename, setFilename] = useState('');
   const navigate = useNavigate();
   const { id } = useParams();
+  const pollRef = useRef(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        const next = Math.min(p + 4, 100);
-        if (next === 100) clearInterval(interval);
-        return next;
-      });
-    }, 150);
-    return () => clearInterval(interval);
-  }, []);
+    let cancelled = false;
 
-  useEffect(() => {
-    setStepIndex(Math.min(Math.floor((progress / 100) * processingSteps.length), processingSteps.length - 1));
-    if (progress >= 100) {
-      const t = setTimeout(() => navigate(`/app/results/${id}`), 500);
-      return () => clearTimeout(t);
+    async function poll() {
+      try {
+        const result = await getDocumentResult(id);
+        if (cancelled) return;
+        setFilename(result.filename);
+        setStatus(result.status);
+
+        if (result.status === 'COMPLETED') {
+          setProgress(100);
+          setTimeout(() => navigate(`/app/results/${id}`), 500);
+          return;
+        }
+        if (result.status === 'FAILED') {
+          return;
+        }
+        setProgress((p) => Math.min(p + 12, 92));
+        pollRef.current = setTimeout(poll, 1200);
+      } catch {
+        pollRef.current = setTimeout(poll, 1500);
+      }
     }
-  }, [progress, id, navigate]);
+
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(pollRef.current);
+    };
+  }, [id, navigate]);
+
+  const stepIndex = Math.min(Math.floor((progress / 100) * processingSteps.length), processingSteps.length - 1);
+
+  if (status === 'FAILED') {
+    return (
+      <AppLayout>
+        <div className="rounded-2xl p-10 flex flex-col items-center text-center" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
+          <AlertTriangle size={40} color="var(--danger)" className="mb-4" />
+          <h1 className="text-xl font-semibold mb-2">Analysis failed</h1>
+          <p className="text-sm text-[var(--text-dim)] mb-6">Something went wrong while processing this document. Try uploading it again.</p>
+          <button
+            onClick={() => navigate('/app/upload')}
+            className="px-5 py-2 rounded-lg text-white text-sm font-medium"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
+          >
+            Back to Upload
+          </button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
-    <AppLayout role="Student" user={currentUser}>
-      <h1 className="text-2xl font-semibold mb-1">Analyzing Your Documents</h1>
+    <AppLayout>
+      <h1 className="text-2xl font-semibold mb-1">Analyzing Your Document</h1>
       <p className="text-[var(--text-dim)] text-sm mb-6">This may take a few minutes. Please keep this page open.</p>
 
       <div className="rounded-2xl p-6" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
@@ -62,7 +99,7 @@ export default function Processing() {
           <FileText size={28} className="text-[var(--accent-2)] shrink-0" />
           <div className="flex-1">
             <div className="flex items-center justify-between text-sm mb-1.5">
-              <span>Assignment1.pdf (2.4 MB)</span>
+              <span>{filename || 'Uploading...'}</span>
               <span className="text-[var(--text-dim)]">{progress}%</span>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>

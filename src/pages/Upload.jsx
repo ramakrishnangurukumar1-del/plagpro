@@ -2,11 +2,14 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UploadCloud, File, X } from 'lucide-react';
 import AppLayout from '../layouts/AppLayout';
-import { currentUser } from '../mock/data';
+import { uploadDocuments } from '../api/documents';
+import { apiErrorMessage } from '../api/client';
 
 export default function Upload() {
   const [files, setFiles] = useState([]);
   const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -25,12 +28,25 @@ export default function Upload() {
     setFiles((prev) => prev.filter((_, idx) => idx !== i));
   }
 
-  function startAnalysis() {
-    navigate('/app/processing/doc1');
+  async function startAnalysis() {
+    setError('');
+    setUploading(true);
+    try {
+      const results = await uploadDocuments(files);
+      if (results.length === 1) {
+        navigate(`/app/processing/${results[0].id}`);
+      } else {
+        navigate('/app/documents');
+      }
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Upload failed'));
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
-    <AppLayout role="Student" user={currentUser}>
+    <AppLayout>
       <h1 className="text-2xl font-semibold mb-1">Upload Documents</h1>
       <p className="text-[var(--text-dim)] text-sm mb-6">Drag and drop your files or click to browse</p>
 
@@ -96,15 +112,21 @@ export default function Upload() {
         </div>
       )}
 
+      {error && (
+        <div className="mt-4 px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--danger)' }}>
+          {error}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-6">
         <span className="text-sm text-[var(--text-dim)]">{files.length} / 10 files</span>
         <button
-          disabled={files.length === 0}
+          disabled={files.length === 0 || uploading}
           onClick={startAnalysis}
           className="px-6 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-40"
           style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
         >
-          Start Analysis
+          {uploading ? 'Uploading...' : 'Start Analysis'}
         </button>
       </div>
     </AppLayout>

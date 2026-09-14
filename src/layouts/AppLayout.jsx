@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Users, Settings, ChevronDown,
 } from 'lucide-react';
 import Logo from '../components/Logo';
+import { useAuth } from '../context/AuthContext';
 
 const studentNav = [
   { to: '/app/home', label: 'Home', icon: Home },
@@ -21,9 +22,16 @@ const facultyNav = [
   { to: '/faculty/settings', label: 'Settings', icon: Settings },
 ];
 
-export default function AppLayout({ children, role = 'Student', user }) {
+export default function AppLayout({ children }) {
+  const { user, logout } = useAuth();
+  const role = user?.role === 'FACULTY' ? 'Faculty' : 'Student';
   const nav = role === 'Faculty' ? facultyNav : studentNav;
   const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--bg)' }}>
@@ -57,7 +65,7 @@ export default function AppLayout({ children, role = 'Student', user }) {
         </nav>
         <div className="px-3 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <button
-            onClick={() => navigate('/login')}
+            onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-dim)] hover:bg-[var(--panel-2)] hover:text-white w-full transition-colors"
           >
             <LogOut size={18} />
@@ -75,10 +83,10 @@ export default function AppLayout({ children, role = 'Student', user }) {
             className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
           >
-            {user?.name?.[0] ?? 'U'}
+            {user?.fullName?.[0] ?? 'U'}
           </div>
           <div className="text-sm">
-            <div className="font-medium leading-tight">{user?.name}</div>
+            <div className="font-medium leading-tight">{user?.fullName}</div>
             <div className="text-xs text-[var(--text-dim)] leading-tight">{role}</div>
           </div>
           <ChevronDown size={16} className="text-[var(--text-dim)]" />

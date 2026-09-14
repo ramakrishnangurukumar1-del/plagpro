@@ -1,9 +1,12 @@
 import AppLayout from '../layouts/AppLayout';
-import { currentUser } from '../mock/data';
+import { useAuth } from '../context/AuthContext';
 
-export default function Profile({ role = 'Student', user = currentUser }) {
+export default function Profile() {
+  const { user } = useAuth();
+  const role = user?.role === 'FACULTY' ? 'Faculty' : 'Student';
+
   return (
-    <AppLayout role={role} user={user}>
+    <AppLayout>
       <h1 className="text-2xl font-semibold mb-6">Profile</h1>
       <div className="rounded-xl p-6 max-w-lg" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
         <div className="flex items-center gap-4 mb-6">
@@ -11,17 +14,17 @@ export default function Profile({ role = 'Student', user = currentUser }) {
             className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-semibold"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' }}
           >
-            {user.name[0]}
+            {user?.fullName?.[0]}
           </div>
           <div>
-            <div className="font-medium text-lg">{user.name}</div>
+            <div className="font-medium text-lg">{user?.fullName}</div>
             <div className="text-sm text-[var(--text-dim)]">{role}</div>
           </div>
         </div>
         <div className="space-y-4 text-sm">
           <div>
             <div className="text-[var(--text-dim)] mb-1">Email</div>
-            <div>{user.email}</div>
+            <div>{user?.email}</div>
           </div>
           <div>
             <div className="text-[var(--text-dim)] mb-1">Role</div>
