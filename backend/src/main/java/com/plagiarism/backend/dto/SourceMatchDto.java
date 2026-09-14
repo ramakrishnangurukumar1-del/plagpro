@@ -1,4 +1,6 @@
 package com.plagiarism.backend.dto;
 
-public record SourceMatchDto(String name, double similarity, String url) {
+import java.util.List;
+
+public record SourceMatchDto(String name, double similarity, String url, List<String> matchedSentences) {
 }

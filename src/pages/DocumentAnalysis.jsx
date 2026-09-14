@@ -127,35 +127,52 @@ export default function DocumentAnalysis() {
           )}
 
           {tab === 'Sources' && (
-            <div className="rounded-xl p-5 max-w-xl" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
+            <div className="rounded-xl p-5 max-w-2xl" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
               <h2 className="text-base font-medium mb-4">Matched Sources</h2>
               {result.plagiarismSources.length === 0 ? (
                 <p className="text-sm text-[var(--text-dim)]">No matching sources found.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {result.plagiarismSources.map((s, i) => (
-                    <div key={s.name} className="flex items-center justify-between pb-3 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--panel-2)', color: 'var(--text-dim)' }}>
-                          {i + 1}
-                        </span>
-                        <div>
-                          <div className="text-sm">{s.name}</div>
-                          <div className="text-xs text-[var(--text-dim)]">Similarity, {s.similarity}%</div>
+                    <div key={s.name} className="pb-4 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--panel-2)', color: 'var(--text-dim)' }}>
+                            {i + 1}
+                          </span>
+                          <div>
+                            <div className="text-sm">{s.name}</div>
+                            <div className="text-xs text-[var(--text-dim)]">Similarity, {s.similarity}%</div>
+                          </div>
                         </div>
+                        {s.url ? (
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs shrink-0"
+                            style={{ color: 'var(--accent-2)' }}
+                          >
+                            <ExternalLink size={14} /> View source
+                          </a>
+                        ) : (
+                          <span className="text-xs text-[var(--text-dim)]">No link</span>
+                        )}
                       </div>
-                      {s.url ? (
-                        <a
-                          href={s.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs shrink-0"
-                          style={{ color: 'var(--accent-2)' }}
-                        >
-                          <ExternalLink size={14} /> View source
-                        </a>
-                      ) : (
-                        <span className="text-xs text-[var(--text-dim)]">No link</span>
+
+                      {s.matchedSentences && s.matchedSentences.length > 0 && (
+                        <div className="mt-3 ml-8 space-y-2">
+                          <div className="text-xs text-[var(--text-dim)] mb-1">Lines in your document that matched this source:</div>
+                          {s.matchedSentences.map((sentence, si) => (
+                            <p
+                              key={si}
+                              className="text-xs leading-relaxed pl-3 py-1.5 rounded"
+                              style={{ background: 'var(--panel-2)', borderLeft: '2px solid var(--warning)' }}
+                            >
+                              {sentence}
+                            </p>
+                          ))}
+                        </div>
                       )}
                     </div>
                   ))}

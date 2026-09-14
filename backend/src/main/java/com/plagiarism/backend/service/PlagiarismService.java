@@ -25,6 +25,7 @@ public class PlagiarismService {
 
     private static final Logger log = LoggerFactory.getLogger(PlagiarismService.class);
     private static final Pattern WORD = Pattern.compile("[a-zA-Z]{4,}");
+    private static final Pattern SENTENCE_SPLIT = Pattern.compile("(?<=[.!?])\\s+");
     private static final Set<String> STOPWORDS = Set.of(
             "this", "that", "with", "from", "have", "were", "they", "their",
             "which", "these", "those", "been", "being", "into", "such", "also"
@@ -52,13 +53,14 @@ public class PlagiarismService {
     public PlagiarismResult check(String text) {
         String query = topKeywords(text, 6);
         Set<String> docWords = significantWords(text);
+        List<String> sentences = splitSentences(text);
 
         List<SourceMatchDto> sources = new ArrayList<>();
-        addIfPresent(sources, checkWikipedia(query, docWords));
-        addIfPresent(sources, checkCrossRef(query, docWords));
-        addIfPresent(sources, checkOpenAlex(query, docWords));
-        addIfPresent(sources, checkArxiv(query, docWords));
-        addIfPresent(sources, checkSemanticScholar(query, docWords));
+        addIfPresent(sources, checkWikipedia(query, docWords, sentences));
+        addIfPresent(sources, checkCrossRef(query, docWords, sentences));
+        addIfPresent(sources, checkOpenAlex(query, docWords, sentences));
+        addIfPresent(sources, checkArxiv(query, docWords, sentences));
+        addIfPresent(sources, checkSemanticScholar(query, docWords, sentences));
 
         sources.sort(Comparator.comparingDouble(SourceMatchDto::similarity).reversed());
 
@@ -76,7 +78,7 @@ public class PlagiarismService {
         }
     }
 
-    private SourceMatchDto checkWikipedia(String query, Set<String> docWords) {
+    private SourceMatchDto checkWikipedia(String query, Set<String> docWords, List<String> sentences) {
         try {
             String json = restClient.get()
                     .uri("https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=1&srsearch={q}", query)
@@ -87,14 +89,16 @@ public class PlagiarismService {
             String title = hits.get(0).path("title").asText("");
             String snippet = hits.get(0).path("snippet").asText("").replaceAll("<[^>]+>", "");
             String url = "https://en.wikipedia.org/wiki/" + java.net.URLEncoder.encode(title.replace(' ', '_'), java.nio.charset.StandardCharsets.UTF_8);
-            return new SourceMatchDto("Wikipedia", round(overlapPercent(docWords, significantWords(snippet))), url);
+            Set<String> sourceWords = significantWords(snippet);
+            return new SourceMatchDto("Wikipedia", round(overlapPercent(docWords, sourceWords)), url,
+                    topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("Wikipedia check failed: {}", e.getMessage());
             return null;
         }
     }
 
-    private SourceMatchDto checkCrossRef(String query, Set<String> docWords) {
+    private SourceMatchDto checkCrossRef(String query, Set<String> docWords, List<String> sentences) {
         try {
             String json = restClient.get()
                     .uri("https://api.crossref.org/works?rows=1&query={q}", query)
@@ -106,14 +110,17 @@ public class PlagiarismService {
                     ? first.path("title").get(0).asText("") : "";
             String doi = first.path("DOI").asText("");
             String url = doi.isBlank() ? first.path("URL").asText("") : "https://doi.org/" + doi;
-            return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, significantWords(title))), url);
+            String abstractText = first.path("abstract").asText("").replaceAll("<[^>]+>", "");
+            Set<String> sourceWords = significantWords(title + " " + abstractText);
+            return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, significantWords(title))), url,
+                    topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("CrossRef check failed: {}", e.getMessage());
             return null;
         }
     }
 
-    private SourceMatchDto checkOpenAlex(String query, Set<String> docWords) {
+    private SourceMatchDto checkOpenAlex(String query, Set<String> docWords, List<String> sentences) {
         try {
             String json = restClient.get()
                     .uri("https://api.openalex.org/works?per-page=1&search={q}", query)
@@ -123,14 +130,16 @@ public class PlagiarismService {
             JsonNode first = results.get(0);
             String title = first.path("title").asText("");
             String url = first.path("doi").asText(first.path("id").asText(""));
-            return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, significantWords(title))), url);
+            Set<String> sourceWords = significantWords(title + " " + abstractFromInvertedIndex(first.path("abstract_inverted_index")));
+            return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, significantWords(title))), url,
+                    topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("OpenAlex check failed: {}", e.getMessage());
             return null;
         }
     }
 
-    private SourceMatchDto checkArxiv(String query, Set<String> docWords) {
+    private SourceMatchDto checkArxiv(String query, Set<String> docWords, List<String> sentences) {
         try {
             String xml = restClient.get()
                     .uri("https://export.arxiv.org/api/query?search_query=all:{q}&max_results=1", query)
@@ -141,28 +150,44 @@ public class PlagiarismService {
             String summary = summaryMatcher.group(1);
             java.util.regex.Matcher idMatcher = Pattern.compile("<id>(.*?)</id>", Pattern.DOTALL).matcher(xml);
             String url = idMatcher.find() ? idMatcher.group(1).trim() : "";
-            return new SourceMatchDto("arXiv", round(overlapPercent(docWords, significantWords(summary))), url);
+            Set<String> sourceWords = significantWords(summary);
+            return new SourceMatchDto("arXiv", round(overlapPercent(docWords, sourceWords)), url,
+                    topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("arXiv check failed: {}", e.getMessage());
             return null;
         }
     }
 
-    private SourceMatchDto checkSemanticScholar(String query, Set<String> docWords) {
+    private SourceMatchDto checkSemanticScholar(String query, Set<String> docWords, List<String> sentences) {
         try {
             String json = restClient.get()
-                    .uri("https://api.semanticscholar.org/graph/v1/paper/search?limit=1&fields=title,url&query={q}", query)
+                    .uri("https://api.semanticscholar.org/graph/v1/paper/search?limit=1&fields=title,url,abstract&query={q}", query)
                     .retrieve().body(String.class);
             JsonNode data = mapper.readTree(json).path("data");
             if (!data.isArray() || data.isEmpty()) return null;
             JsonNode first = data.get(0);
             String title = first.path("title").asText("");
+            String abstractText = first.path("abstract").asText("");
             String url = first.path("url").asText("");
-            return new SourceMatchDto("Semantic Scholar", round(overlapPercent(docWords, significantWords(title))), url);
+            Set<String> sourceWords = significantWords(title + " " + abstractText);
+            return new SourceMatchDto("Semantic Scholar", round(overlapPercent(docWords, significantWords(title))), url,
+                    topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("Semantic Scholar check failed: {}", e.getMessage());
             return null;
         }
+    }
+
+    /** Reconstructs plain text from OpenAlex's word->positions inverted index format. */
+    private String abstractFromInvertedIndex(JsonNode invertedIndex) {
+        if (invertedIndex == null || !invertedIndex.isObject()) return "";
+        Map<Integer, String> positions = new TreeMap<>();
+        invertedIndex.properties().forEach(entry -> {
+            String word = entry.getKey();
+            entry.getValue().forEach(idx -> positions.put(idx.asInt(), word));
+        });
+        return String.join(" ", positions.values());
     }
 
     private String topKeywords(String text, int count) {
@@ -180,6 +205,30 @@ public class PlagiarismService {
                 .map(Map.Entry::getKey)
                 .reduce((a, b) -> a + " " + b)
                 .orElse(text.length() > 40 ? text.substring(0, 40) : text);
+    }
+
+    private List<String> splitSentences(String text) {
+        List<String> sentences = new ArrayList<>();
+        for (String s : SENTENCE_SPLIT.split(text)) {
+            String trimmed = s.strip();
+            if (!trimmed.isEmpty()) sentences.add(trimmed);
+        }
+        return sentences;
+    }
+
+    /** Sentences from the document with the highest word-overlap against a
+     * specific source's comparison text, so a viewer can see exactly which
+     * lines in their document triggered that match. */
+    private List<String> topMatchingSentences(List<String> sentences, Set<String> sourceWords) {
+        if (sourceWords.isEmpty()) return List.of();
+        record Scored(String sentence, double score) {}
+        return sentences.stream()
+                .map(s -> new Scored(s, overlapPercent(sourceWords, significantWords(s))))
+                .filter(s -> s.score() >= 40.0)
+                .sorted(Comparator.comparingDouble(Scored::score).reversed())
+                .limit(3)
+                .map(Scored::sentence)
+                .toList();
     }
 
     private Set<String> significantWords(String text) {
