@@ -94,27 +94,43 @@ function Scene() {
   const shapes = useMemo(() => {
     const kinds = ['ico', 'oct', 'torus'];
     const colors = [PURPLE, TEAL];
-    return Array.from({ length: 16 }, (_, i) => ({
-      position: [
-        (seeded(i * 1.7) - 0.5) * 20,
-        (seeded(i * 2.9) - 0.5) * 13,
-        (seeded(i * 4.1) - 0.5) * 6 - 8,
-      ],
-      kind: kinds[i % kinds.length],
-      color: colors[i % colors.length],
-      scale: 0.45 + seeded(i * 6.3) * 0.85,
-      speed: 0.25 + seeded(i * 8.9) * 0.5,
-    }));
+    const cols = 7;
+    const rows = 6;
+    const cellW = 32 / cols;
+    const cellH = 26 / rows;
+    const items = [];
+    let i = 0;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++, i++) {
+        // Skip the center-most cells so the headline text has breathing room.
+        const isCenterRow = row === Math.floor(rows / 2) || row === Math.floor(rows / 2) - 1;
+        const isCenterCol = col === Math.floor(cols / 2) || col === Math.floor(cols / 2) - 1;
+        if (isCenterRow && isCenterCol) continue;
+
+        const cx = -16 + cellW * (col + 0.5) + (seeded(i * 1.7) - 0.5) * cellW * 0.7;
+        const cy = -13 + cellH * (row + 0.5) + (seeded(i * 2.9) - 0.5) * cellH * 0.7;
+        const cz = -4 - seeded(i * 4.1) * 11;
+
+        items.push({
+          position: [cx, cy, cz],
+          kind: kinds[i % kinds.length],
+          color: colors[i % colors.length],
+          scale: 0.4 + seeded(i * 6.3) * 0.8,
+          speed: 0.25 + seeded(i * 8.9) * 0.5,
+        });
+      }
+    }
+    return items;
   }, []);
 
   const bots = useMemo(
     () =>
-      Array.from({ length: 5 }, (_, i) => ({
-        radius: 3 + seeded(i * 11.1) * 4,
+      Array.from({ length: 6 }, (_, i) => ({
+        radius: 5 + seeded(i * 11.1) * 10,
         phase: seeded(i * 13.7) * Math.PI * 2,
-        speedX: 0.15 + seeded(i * 17.3) * 0.25,
-        speedY: 0.12 + seeded(i * 19.9) * 0.25,
-        depth: -1 - seeded(i * 23.1) * 4,
+        speedX: 0.12 + seeded(i * 17.3) * 0.2,
+        speedY: 0.1 + seeded(i * 19.9) * 0.2,
+        depth: -2 - seeded(i * 23.1) * 8,
         scale: 0.8 + seeded(i * 29.7) * 0.9,
       })),
     []
@@ -122,8 +138,10 @@ function Scene() {
 
   useFrame(() => {
     if (!group.current) return;
-    const targetY = pointer.current.x * 0.35;
-    const targetX = -pointer.current.y * 0.22;
+    const clampedX = Math.max(-1, Math.min(1, pointer.current.x));
+    const clampedY = Math.max(-1, Math.min(1, pointer.current.y));
+    const targetY = clampedX * 0.2;
+    const targetX = -clampedY * 0.12;
     group.current.rotation.y += (targetY - group.current.rotation.y) * 0.04;
     group.current.rotation.x += (targetX - group.current.rotation.x) * 0.04;
   });

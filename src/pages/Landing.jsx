@@ -82,7 +82,7 @@ export default function Landing() {
         </Suspense>
         <div
           className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at center, rgba(7,8,13,0.55) 0%, rgba(7,8,13,0.15) 35%, transparent 55%, var(--pp-bg) 100%)' }}
+          style={{ background: 'radial-gradient(ellipse 55% 45% at center, rgba(7,8,13,0.65) 0%, rgba(7,8,13,0.3) 45%, transparent 80%)' }}
         />
 
         <div className="relative z-10 text-center max-w-3xl mx-auto pt-16">
