@@ -1,6 +1,8 @@
+import { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UploadCloud, Sparkles, ScanSearch, FileStack, FileBarChart2 } from 'lucide-react';
 import Logo from '../components/Logo';
+import NeuralScene from '../components/NeuralScene';
 
 const features = [
   { icon: Sparkles, title: 'AI Content Detection', desc: 'Find AI-generated patterns' },
@@ -70,10 +72,15 @@ export default function Landing() {
 
         <div className="flex items-center justify-center">
           <div
-            className="w-full aspect-square max-w-md rounded-3xl flex items-center justify-center"
+            className="w-full aspect-square max-w-md rounded-3xl overflow-hidden relative"
             style={{ background: 'linear-gradient(135deg, var(--panel), var(--panel-2))', border: '1px solid var(--border)' }}
           >
-            <ScanSearch size={140} color="var(--accent-2)" strokeWidth={1} />
+            <Suspense fallback={null}>
+              <NeuralScene />
+            </Suspense>
+            <span className="absolute bottom-3 right-4 text-[10px] text-[var(--text-dim)] pointer-events-none select-none">
+              drag to rotate · scroll to zoom
+            </span>
           </div>
         </div>
       </section>
