@@ -24,8 +24,8 @@ export default function ReportPreview() {
       <div className="flex-1 flex items-center justify-center py-10 px-4">
         <div className="w-full max-w-2xl bg-white text-gray-900 rounded-lg shadow-2xl p-10">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }} />
-            <span className="text-xs font-semibold text-gray-500">AI PLAGIARISM DETECTOR</span>
+            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #7c5cff, #33e0c9)' }} />
+            <span className="text-xs font-semibold text-gray-500">PLAGPRO</span>
           </div>
           <h1 className="text-xl font-bold mt-4 mb-1">Document Analysis Report</h1>
           <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-6 pb-4 border-b">
@@ -37,12 +37,12 @@ export default function ReportPreview() {
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="border rounded-lg p-4">
               <div className="text-xs text-gray-500 mb-2">AI Content Detection</div>
-              <div className="text-2xl font-bold" style={{ color: '#8b5cf6' }}>72%</div>
+              <div className="text-2xl font-bold" style={{ color: '#7c5cff' }}>72%</div>
               <div className="text-xs text-gray-500">Likely AI-generated</div>
             </div>
             <div className="border rounded-lg p-4">
               <div className="text-xs text-gray-500 mb-2">Plagiarism Detection</div>
-              <div className="text-2xl font-bold" style={{ color: '#f59e0b' }}>18%</div>
+              <div className="text-2xl font-bold" style={{ color: '#f5a524' }}>18%</div>
               <div className="text-xs text-gray-500">Matched with sources</div>
             </div>
           </div>
