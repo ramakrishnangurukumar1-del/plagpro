@@ -27,5 +27,5 @@
 
 - `service/fileprocessor/` — `FileProcessor` abstract class with `PdfFileProcessor` (PDFBox), `ImageFileProcessor` (Tess4J OCR), `DocxFileProcessor` (Apache POI), selected at runtime by `FileProcessorFactory`.
 - `service/AIAnalyzer` — interface implemented by `MlServiceClient`, which delegates to the Flask ML service. Swappable without touching `DocumentService`.
-- `service/PlagiarismService` — queries Wikipedia, CrossRef, OpenAlex, arXiv, and Semantic Scholar directly and scores word-overlap per source.
+- `service/PlagiarismService` — queries Wikipedia, CrossRef, OpenAlex, DOAJ, and Europe PMC directly and scores word-overlap per source.
 - Document analysis runs asynchronously (`@Async`) after upload; poll `GET /api/documents/{id}/result` for status.

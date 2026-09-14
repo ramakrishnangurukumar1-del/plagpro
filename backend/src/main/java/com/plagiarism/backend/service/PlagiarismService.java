@@ -59,8 +59,8 @@ public class PlagiarismService {
         addIfPresent(sources, checkWikipedia(query, docWords, sentences));
         addIfPresent(sources, checkCrossRef(query, docWords, sentences));
         addIfPresent(sources, checkOpenAlex(query, docWords, sentences));
-        addIfPresent(sources, checkArxiv(query, docWords, sentences));
-        addIfPresent(sources, checkSemanticScholar(query, docWords, sentences));
+        addIfPresent(sources, checkDoaj(query, docWords, sentences));
+        addIfPresent(sources, checkEuropePmc(query, docWords, sentences));
 
         sources.sort(Comparator.comparingDouble(SourceMatchDto::similarity).reversed());
 
@@ -139,42 +139,57 @@ public class PlagiarismService {
         }
     }
 
-    private SourceMatchDto checkArxiv(String query, Set<String> docWords, List<String> sentences) {
+    private SourceMatchDto checkDoaj(String query, Set<String> docWords, List<String> sentences) {
         try {
-            String xml = restClient.get()
-                    .uri("https://export.arxiv.org/api/query?search_query=all:{q}&max_results=1", query)
+            String json = restClient.get()
+                    .uri("https://doaj.org/api/search/articles/{q}?pageSize=1", query)
                     .retrieve().body(String.class);
-            if (xml == null) return null;
-            java.util.regex.Matcher summaryMatcher = Pattern.compile("<summary>(.*?)</summary>", Pattern.DOTALL).matcher(xml);
-            if (!summaryMatcher.find()) return null;
-            String summary = summaryMatcher.group(1);
-            java.util.regex.Matcher idMatcher = Pattern.compile("<id>(.*?)</id>", Pattern.DOTALL).matcher(xml);
-            String url = idMatcher.find() ? idMatcher.group(1).trim() : "";
-            Set<String> sourceWords = significantWords(summary);
-            return new SourceMatchDto("arXiv", round(overlapPercent(docWords, sourceWords)), url,
+            JsonNode results = mapper.readTree(json).path("results");
+            if (!results.isArray() || results.isEmpty()) return null;
+            JsonNode bibjson = results.get(0).path("bibjson");
+            String title = bibjson.path("title").asText("");
+            String abstractText = bibjson.path("abstract").asText("");
+
+            String url = "";
+            for (JsonNode id : bibjson.path("identifier")) {
+                if ("doi".equalsIgnoreCase(id.path("type").asText())) {
+                    url = "https://doi.org/" + id.path("id").asText();
+                    break;
+                }
+            }
+            if (url.isBlank()) {
+                JsonNode links = bibjson.path("link");
+                if (links.isArray() && !links.isEmpty()) url = links.get(0).path("url").asText("");
+            }
+
+            Set<String> sourceWords = significantWords(title + " " + abstractText);
+            return new SourceMatchDto("DOAJ", round(overlapPercent(docWords, significantWords(title))), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
-            log.debug("arXiv check failed: {}", e.getMessage());
+            log.debug("DOAJ check failed: {}", e.getMessage());
             return null;
         }
     }
 
-    private SourceMatchDto checkSemanticScholar(String query, Set<String> docWords, List<String> sentences) {
+    private SourceMatchDto checkEuropePmc(String query, Set<String> docWords, List<String> sentences) {
         try {
             String json = restClient.get()
-                    .uri("https://api.semanticscholar.org/graph/v1/paper/search?limit=1&fields=title,url,abstract&query={q}", query)
+                    .uri("https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={q}&format=json&pageSize=1&resultType=core", query)
                     .retrieve().body(String.class);
-            JsonNode data = mapper.readTree(json).path("data");
-            if (!data.isArray() || data.isEmpty()) return null;
-            JsonNode first = data.get(0);
+            JsonNode results = mapper.readTree(json).path("resultList").path("result");
+            if (!results.isArray() || results.isEmpty()) return null;
+            JsonNode first = results.get(0);
             String title = first.path("title").asText("");
-            String abstractText = first.path("abstract").asText("");
-            String url = first.path("url").asText("");
+            String abstractText = first.path("abstractText").asText("");
+            String doi = first.path("doi").asText("");
+            String url = doi.isBlank()
+                    ? "https://europepmc.org/article/" + first.path("source").asText("MED") + "/" + first.path("id").asText("")
+                    : "https://doi.org/" + doi;
             Set<String> sourceWords = significantWords(title + " " + abstractText);
-            return new SourceMatchDto("Semantic Scholar", round(overlapPercent(docWords, significantWords(title))), url,
+            return new SourceMatchDto("Europe PMC", round(overlapPercent(docWords, significantWords(title))), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
-            log.debug("Semantic Scholar check failed: {}", e.getMessage());
+            log.debug("Europe PMC check failed: {}", e.getMessage());
             return null;
         }
     }
