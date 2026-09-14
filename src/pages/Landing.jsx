@@ -1,8 +1,6 @@
 import { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ScanEye, Sparkles, FileStack, Network, ShieldCheck } from 'lucide-react';
 import HeroScene from '../components/HeroScene';
-import Marquee from '../components/Marquee';
 
 function Logo({ size = 30 }) {
   return (
@@ -22,13 +20,6 @@ function Logo({ size = 30 }) {
     </div>
   );
 }
-
-const navLinks = [
-  { href: '#how', label: 'How it works' },
-  { href: '#detection', label: 'Detection' },
-  { href: '#tech', label: 'Tech' },
-  { href: '#faq', label: 'FAQ' },
-];
 
 function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -64,11 +55,6 @@ export default function Landing() {
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm">
             <button onClick={() => scrollTo('home')} className="hover:opacity-80 transition-opacity" style={{ color: 'var(--pp-text-dim)' }}>Home</button>
-            {navLinks.map((l) => (
-              <button key={l.href} onClick={() => scrollTo(l.href.slice(1))} className="hover:opacity-80 transition-opacity" style={{ color: 'var(--pp-text-dim)' }}>
-                {l.label}
-              </button>
-            ))}
           </nav>
           <div className="flex items-center gap-2">
             <button
@@ -123,13 +109,6 @@ export default function Landing() {
             >
               Try a document
             </button>
-            <button
-              onClick={() => scrollTo('how')}
-              className="px-7 py-3 rounded-full font-medium"
-              style={{ border: '1px solid var(--pp-border)', color: 'var(--pp-text)' }}
-            >
-              See how it works
-            </button>
           </div>
 
           <div className="grid grid-cols-3 gap-4 max-w-xl mx-auto">
@@ -144,88 +123,6 @@ export default function Landing() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how" className="relative z-10 px-6 py-24 max-w-5xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-3">How it works</h2>
-        <p className="text-center mb-14" style={{ color: 'var(--pp-text-dim)' }}>
-          One upload, two independent checks, one report.
-        </p>
-        <div className="grid md:grid-cols-4 gap-5">
-          {[
-            { icon: FileStack, title: 'Upload', desc: 'Drop a PDF, scan, or DOCX — up to 10 files at once.' },
-            { icon: ScanEye, title: 'Extract', desc: 'Text is pulled out via OCR or direct parsing.' },
-            { icon: Network, title: 'Dual analysis', desc: 'Source-matching and AI-pattern detection run in parallel.' },
-            { icon: ShieldCheck, title: 'Report', desc: 'Get a combined score with full source-level detail.' },
-          ].map(({ icon: Icon, title, desc }, i) => (
-            <div key={title} className="rounded-2xl p-5 backdrop-blur-md" style={{ background: 'var(--pp-panel)', border: '1px solid var(--pp-border)' }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: 'linear-gradient(135deg, var(--pp-purple), var(--pp-teal))' }}>
-                <Icon size={20} color="white" />
-              </div>
-              <div className="text-xs mb-1" style={{ color: 'var(--pp-teal)' }}>Step {i + 1}</div>
-              <div className="font-medium mb-1.5">{title}</div>
-              <div className="text-sm" style={{ color: 'var(--pp-text-dim)' }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Detection */}
-      <section id="detection" className="relative z-10 px-6 py-24 max-w-5xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-3">Two very different problems</h2>
-        <p className="text-center mb-14" style={{ color: 'var(--pp-text-dim)' }}>
-          Copied text and AI-written text don't look the same to a detector — so we don't check them the same way.
-        </p>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="rounded-2xl p-7 backdrop-blur-md" style={{ background: 'var(--pp-panel)', border: '1px solid var(--pp-border)' }}>
-            <Sparkles size={24} color="var(--pp-purple)" className="mb-4" />
-            <h3 className="text-xl font-semibold mb-2">AI-writing detection</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--pp-text-dim)' }}>
-              Six model signals — RoBERTa, BERT, GPT-2 perplexity, burstiness, zero-shot tone, and a lightweight fallback — combined into one confidence score.
-            </p>
-            <ul className="text-sm space-y-1.5" style={{ color: 'var(--pp-text-dim)' }}>
-              <li>• No source needed — flags the writing pattern itself</li>
-              <li>• Sentence-level breakdown, not just a single score</li>
-            </ul>
-          </div>
-          <div className="rounded-2xl p-7 backdrop-blur-md" style={{ background: 'var(--pp-panel)', border: '1px solid var(--pp-border)' }}>
-            <Network size={24} color="var(--pp-teal)" className="mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Plagiarism / source matching</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--pp-text-dim)' }}>
-              Cross-checked against Wikipedia, CrossRef, OpenAlex, arXiv, Semantic Scholar, and web search.
-            </p>
-            <ul className="text-sm space-y-1.5" style={{ color: 'var(--pp-text-dim)' }}>
-              <li>• Matches real, existing sources</li>
-              <li>• Similarity scored per source, not just overall</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* Tech marquee */}
-      <section id="tech" className="relative z-10 py-16 border-y" style={{ borderColor: 'var(--pp-border)' }}>
-        <p className="text-center text-xs uppercase tracking-widest mb-4" style={{ color: 'var(--pp-text-dim)' }}>
-          Models &amp; sources we check against
-        </p>
-        <Marquee />
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="relative z-10 px-6 py-24 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-12">Frequently asked</h2>
-        <div className="space-y-3">
-          {[
-            ['Does it search the internet for every check?', 'Only for plagiarism matching. AI-writing detection analyzes the text itself and needs no external source.'],
-            ['What file types are supported?', 'PDF, JPG/PNG scans (via OCR), and DOCX — up to 10 files per batch.'],
-            ['Is an AI-detection score a guarantee?', 'No — it\'s a confidence signal from an ensemble of models, not a verdict. Always paired with human judgment.'],
-          ].map(([q, a]) => (
-            <details key={q} className="rounded-xl p-4 backdrop-blur-md" style={{ background: 'var(--pp-panel)', border: '1px solid var(--pp-border)' }}>
-              <summary className="cursor-pointer font-medium">{q}</summary>
-              <p className="text-sm mt-2" style={{ color: 'var(--pp-text-dim)' }}>{a}</p>
-            </details>
-          ))}
         </div>
       </section>
 
