@@ -36,7 +36,10 @@ public class PlagiarismService {
     public PlagiarismService() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) Duration.ofSeconds(5).toMillis());
-        requestFactory.setReadTimeout((int) Duration.ofSeconds(8).toMillis());
+        // arXiv's export API in particular routinely takes 6-7s to respond;
+        // give every source enough headroom that a slow-but-healthy response
+        // isn't mistaken for a dead source.
+        requestFactory.setReadTimeout((int) Duration.ofSeconds(15).toMillis());
         // Wikimedia (and some other APIs) reject requests with a generic/default
         // User-Agent (e.g. Java's own "Java/21") with a 403. A descriptive UA is
         // required by their bot policy: https://w.wiki/4wJS
