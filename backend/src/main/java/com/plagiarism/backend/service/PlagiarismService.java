@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.plagiarism.backend.dto.PlagiarismResult;
 import com.plagiarism.backend.dto.SourceMatchDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -21,6 +23,7 @@ import java.util.regex.Pattern;
 @Service
 public class PlagiarismService {
 
+    private static final Logger log = LoggerFactory.getLogger(PlagiarismService.class);
     private static final Pattern WORD = Pattern.compile("[a-zA-Z]{4,}");
     private static final Set<String> STOPWORDS = Set.of(
             "this", "that", "with", "from", "have", "were", "they", "their",
@@ -34,7 +37,13 @@ public class PlagiarismService {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) Duration.ofSeconds(5).toMillis());
         requestFactory.setReadTimeout((int) Duration.ofSeconds(8).toMillis());
-        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+        // Wikimedia (and some other APIs) reject requests with a generic/default
+        // User-Agent (e.g. Java's own "Java/21") with a 403. A descriptive UA is
+        // required by their bot policy: https://w.wiki/4wJS
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .defaultHeader("User-Agent", "PlagPro/1.0 (college project; contact: admin@plagpro.local)")
+                .build();
     }
 
     public PlagiarismResult check(String text) {
@@ -77,6 +86,7 @@ public class PlagiarismService {
             String url = "https://en.wikipedia.org/wiki/" + java.net.URLEncoder.encode(title.replace(' ', '_'), java.nio.charset.StandardCharsets.UTF_8);
             return new SourceMatchDto("Wikipedia", round(overlapPercent(docWords, significantWords(snippet))), url);
         } catch (Exception e) {
+            log.debug("Wikipedia check failed: {}", e.getMessage());
             return null;
         }
     }
@@ -95,6 +105,7 @@ public class PlagiarismService {
             String url = doi.isBlank() ? first.path("URL").asText("") : "https://doi.org/" + doi;
             return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, significantWords(title))), url);
         } catch (Exception e) {
+            log.debug("CrossRef check failed: {}", e.getMessage());
             return null;
         }
     }
@@ -111,6 +122,7 @@ public class PlagiarismService {
             String url = first.path("doi").asText(first.path("id").asText(""));
             return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, significantWords(title))), url);
         } catch (Exception e) {
+            log.debug("OpenAlex check failed: {}", e.getMessage());
             return null;
         }
     }
@@ -128,6 +140,7 @@ public class PlagiarismService {
             String url = idMatcher.find() ? idMatcher.group(1).trim() : "";
             return new SourceMatchDto("arXiv", round(overlapPercent(docWords, significantWords(summary))), url);
         } catch (Exception e) {
+            log.debug("arXiv check failed: {}", e.getMessage());
             return null;
         }
     }
@@ -144,6 +157,7 @@ public class PlagiarismService {
             String url = first.path("url").asText("");
             return new SourceMatchDto("Semantic Scholar", round(overlapPercent(docWords, significantWords(title))), url);
         } catch (Exception e) {
+            log.debug("Semantic Scholar check failed: {}", e.getMessage());
             return null;
         }
     }
