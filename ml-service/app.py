@@ -31,28 +31,40 @@ _models = {"loaded": False, "roberta": None, "roberta_tok": None, "gpt2": None, 
 
 def load_models():
     """Lazily load transformer models on first request so the server
-    starts instantly; subsequent requests reuse the cached models."""
+    starts instantly; subsequent requests reuse the cached models.
+    RoBERTa and GPT-2 are loaded independently so a failure in one
+    (e.g. a memory-constrained machine choking on GPT-2) doesn't take
+    the other down with it."""
     with _models_lock:
         if _models["loaded"]:
             return
-        try:
-            from transformers import (
-                AutoModelForSequenceClassification,
-                AutoTokenizer,
-                GPT2LMHeadModel,
-                GPT2TokenizerFast,
-            )
 
+        from transformers import (
+            AutoModelForSequenceClassification,
+            AutoTokenizer,
+            GPT2LMHeadModel,
+            GPT2TokenizerFast,
+        )
+
+        try:
             roberta_name = "Hello-SimpleAI/chatgpt-detector-roberta"
             _models["roberta_tok"] = AutoTokenizer.from_pretrained(roberta_name)
             _models["roberta"] = AutoModelForSequenceClassification.from_pretrained(roberta_name)
             _models["roberta"].eval()
+        except Exception as e:
+            app.logger.warning("RoBERTa unavailable, dropping that signal: %s", e)
+            _models["roberta"] = None
+            _models["roberta_tok"] = None
 
+        try:
             _models["gpt2_tok"] = GPT2TokenizerFast.from_pretrained("gpt2")
             _models["gpt2"] = GPT2LMHeadModel.from_pretrained("gpt2")
             _models["gpt2"].eval()
         except Exception as e:
-            app.logger.warning("Transformer models unavailable, falling back to heuristics only: %s", e)
+            app.logger.warning("GPT-2 unavailable, dropping that signal: %s", e)
+            _models["gpt2"] = None
+            _models["gpt2_tok"] = None
+
         _models["loaded"] = True
 
 
@@ -158,7 +170,12 @@ def gpt2_perplexity_score(text):
 
 @app.get("/health")
 def health():
-    return jsonify(status="ok", modelsLoaded=_models["loaded"], transformersAvailable=_models["roberta"] is not None)
+    return jsonify(
+        status="ok",
+        modelsLoaded=_models["loaded"],
+        robertaAvailable=_models["roberta"] is not None,
+        gpt2Available=_models["gpt2"] is not None,
+    )
 
 
 @app.post("/analyze")
