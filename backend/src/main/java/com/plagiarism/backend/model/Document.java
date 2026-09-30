@@ -42,7 +42,7 @@ public class Document {
 
     private Instant completedAt;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
     public Document(User owner, String originalFilename, String storedPath, String fileType, long sizeBytes) {

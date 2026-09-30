@@ -6,6 +6,7 @@ import com.plagiarism.backend.model.*;
 import com.plagiarism.backend.repository.AnalysisResultRepository;
 import com.plagiarism.backend.repository.DocumentRepository;
 import com.plagiarism.backend.service.fileprocessor.FileProcessorFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Async;
@@ -31,6 +32,20 @@ public class DocumentService {
     private final AIAnalyzer aiAnalyzer;
     private final PlagiarismService plagiarismService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Spring's @Async only takes effect through the proxy; calling
+    // processDocument(...) directly from within this same class (self-
+    // invocation) bypasses that proxy entirely and just runs it inline on
+    // the caller's thread. Injecting a lazy self-reference and calling
+    // through it routes the call back through the proxy so @Async actually
+    // applies. Without this, uploadAndAnalyze() silently ran the whole
+    // extraction + AI + plagiarism pipeline synchronously before returning
+    // the HTTP response - fast enough locally to go unnoticed, but tens of
+    // seconds on a slower host with real network calls to five external
+    // APIs plus the ML service.
+    @Lazy
+    @org.springframework.beans.factory.annotation.Autowired
+    private DocumentService self;
 
     @Value("${app.upload.dir}")
     private String uploadDir;
@@ -58,7 +73,7 @@ public class DocumentService {
         }
 
         List<Document> saved = files.stream().map(f -> storeAndCreate(f, owner)).toList();
-        saved.forEach(doc -> processDocument(doc.getId()));
+        saved.forEach(doc -> self.processDocument(doc.getId()));
         return saved.stream().map(this::toSummary).toList();
     }
 
