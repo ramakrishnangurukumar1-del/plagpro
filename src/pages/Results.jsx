@@ -55,6 +55,16 @@ export default function Results() {
         <div className="rounded-xl p-6 flex flex-col items-center" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
           <span className="text-sm text-[var(--text-dim)] mb-4 self-start">AI CONTENT</span>
           <Donut value={Math.round(result.aiPercent)} color="var(--accent-2)" label="Likely AI-generated" />
+          {result.modelScores.length > 1 && (() => {
+            const scores = result.modelScores.map((m) => m.score);
+            const lo = Math.round(Math.min(...scores));
+            const hi = Math.round(Math.max(...scores));
+            return (
+              <p className="text-xs text-[var(--text-dim)] mt-3 text-center">
+                Range: {lo}%–{hi}% across {scores.length} signal{scores.length > 1 ? 's' : ''}
+              </p>
+            );
+          })()}
         </div>
         <div className="rounded-xl p-6 flex flex-col items-center" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
           <span className="text-sm text-[var(--text-dim)] mb-4 self-start">PLAGIARISM</span>
