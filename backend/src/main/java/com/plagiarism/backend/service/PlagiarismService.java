@@ -6,6 +6,7 @@ import com.plagiarism.backend.dto.PlagiarismResult;
 import com.plagiarism.backend.dto.SourceMatchDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -34,6 +35,14 @@ public class PlagiarismService {
     private final RestClient restClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // Wikipedia/CrossRef/OpenAlex/DOAJ/Europe PMC only index encyclopedia and
+    // academic-paper content, so a document copied from an ordinary web page
+    // (a template site, a blog, a business report) never matches any of them.
+    // Brave Search closes that gap. It's optional - unset the key and this
+    // source is silently skipped like any other source that returns nothing.
+    @Value("${app.brave.api-key:}")
+    private String braveApiKey;
+
     public PlagiarismService() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) Duration.ofSeconds(5).toMillis());
@@ -61,6 +70,7 @@ public class PlagiarismService {
         addIfPresent(sources, checkOpenAlex(query, docWords, sentences));
         addIfPresent(sources, checkDoaj(query, docWords, sentences));
         addIfPresent(sources, checkEuropePmc(query, docWords, sentences));
+        addIfPresent(sources, checkBraveSearch(distinctivePhrase(sentences), docWords, sentences));
 
         sources.sort(Comparator.comparingDouble(SourceMatchDto::similarity).reversed());
 
@@ -197,6 +207,43 @@ public class PlagiarismService {
             log.debug("Europe PMC check failed: {}", e.getMessage());
             return null;
         }
+    }
+
+    private SourceMatchDto checkBraveSearch(String phrase, Set<String> docWords, List<String> sentences) {
+        if (braveApiKey == null || braveApiKey.isBlank() || phrase.isBlank()) return null;
+        try {
+            String json = restClient.get()
+                    .uri("https://api.search.brave.com/res/v1/web/search?q={q}&count=1", "\"" + phrase + "\"")
+                    .header("Accept", "application/json")
+                    .header("X-Subscription-Token", braveApiKey)
+                    .retrieve().body(String.class);
+            JsonNode results = mapper.readTree(json).path("web").path("results");
+            if (!results.isArray() || results.isEmpty()) return null;
+            JsonNode first = results.get(0);
+            String title = first.path("title").asText("").replaceAll("<[^>]+>", "");
+            String description = first.path("description").asText("").replaceAll("<[^>]+>", "");
+            String url = first.path("url").asText("");
+            Set<String> sourceWords = significantWords(title + " " + description);
+            if (tooSmallToScore(sourceWords)) return null;
+            return new SourceMatchDto("Web (Brave Search)", round(overlapPercent(docWords, sourceWords)), url,
+                    topMatchingSentences(sentences, sourceWords));
+        } catch (Exception e) {
+            log.debug("Brave Search check failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** Picks one sentence of reasonable length to search for as an exact
+     * phrase - short/generic sentences produce noisy web-search results, and
+     * whole-paragraph queries rarely match anything verbatim. */
+    private String distinctivePhrase(List<String> sentences) {
+        return sentences.stream()
+                .filter(s -> {
+                    int words = s.split("\\s+").length;
+                    return words >= 8 && words <= 20;
+                })
+                .findFirst()
+                .orElse(sentences.isEmpty() ? "" : sentences.get(0));
     }
 
     /** Reconstructs plain text from OpenAlex's word->positions inverted index format. */
