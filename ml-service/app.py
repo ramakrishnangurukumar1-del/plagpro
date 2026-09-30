@@ -59,10 +59,20 @@ def load_models():
             try:
                 roberta_name = "Hello-SimpleAI/chatgpt-detector-roberta"
                 _models["roberta_tok"] = AutoTokenizer.from_pretrained(roberta_name)
-                _models["roberta"] = AutoModelForSequenceClassification.from_pretrained(
+                model = AutoModelForSequenceClassification.from_pretrained(
                     roberta_name, low_cpu_mem_usage=True
                 )
-                _models["roberta"].eval()
+                model.eval()
+                # Dynamic INT8 quantization of the Linear layers (the bulk of a
+                # transformer's parameters) cuts their memory ~4x with minimal
+                # accuracy loss for classification - the difference between
+                # fitting in a memory-constrained host and getting OOM-killed.
+                model = torch.quantization.quantize_dynamic(
+                    model, {torch.nn.Linear}, dtype=torch.qint8
+                )
+                _models["roberta"] = model
+                import gc
+                gc.collect()
             except Exception as e:
                 app.logger.warning("RoBERTa unavailable, dropping that signal: %s", e)
                 _models["roberta"] = None
