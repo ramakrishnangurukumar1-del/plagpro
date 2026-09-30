@@ -90,6 +90,7 @@ public class PlagiarismService {
             String snippet = hits.get(0).path("snippet").asText("").replaceAll("<[^>]+>", "");
             String url = "https://en.wikipedia.org/wiki/" + java.net.URLEncoder.encode(title.replace(' ', '_'), java.nio.charset.StandardCharsets.UTF_8);
             Set<String> sourceWords = significantWords(snippet);
+            if (tooSmallToScore(sourceWords)) return null;
             return new SourceMatchDto("Wikipedia", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
@@ -112,6 +113,7 @@ public class PlagiarismService {
             String url = doi.isBlank() ? first.path("URL").asText("") : "https://doi.org/" + doi;
             String abstractText = first.path("abstract").asText("").replaceAll("<[^>]+>", "");
             Set<String> sourceWords = significantWords(title + " " + abstractText);
+            if (tooSmallToScore(sourceWords)) return null;
             return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
@@ -131,6 +133,7 @@ public class PlagiarismService {
             String title = first.path("title").asText("");
             String url = first.path("doi").asText(first.path("id").asText(""));
             Set<String> sourceWords = significantWords(title + " " + abstractFromInvertedIndex(first.path("abstract_inverted_index")));
+            if (tooSmallToScore(sourceWords)) return null;
             return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
@@ -163,6 +166,7 @@ public class PlagiarismService {
             }
 
             Set<String> sourceWords = significantWords(title + " " + abstractText);
+            if (tooSmallToScore(sourceWords)) return null;
             return new SourceMatchDto("DOAJ", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
@@ -186,6 +190,7 @@ public class PlagiarismService {
                     ? "https://europepmc.org/article/" + first.path("source").asText("MED") + "/" + first.path("id").asText("")
                     : "https://doi.org/" + doi;
             Set<String> sourceWords = significantWords(title + " " + abstractText);
+            if (tooSmallToScore(sourceWords)) return null;
             return new SourceMatchDto("Europe PMC", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
@@ -260,6 +265,19 @@ public class PlagiarismService {
         if (a.isEmpty() || b.isEmpty()) return 0.0;
         long shared = b.stream().filter(a::contains).count();
         return Math.min(100.0, (shared * 100.0) / Math.min(a.size(), b.size()));
+    }
+
+    // A source's comparison text (title, or title+abstract) needs a minimum
+    // amount of real content before its overlap score means anything. Many
+    // CrossRef records in particular have no abstract in their metadata, so
+    // sourceWords collapses to just the title - sometimes only 2-3 words -
+    // which can trivially "overlap" 100% with almost any document purely by
+    // chance word choice (e.g. a paper titled "Every Afternoon" matching a
+    // document that happens to contain the phrase "every afternoon").
+    private static final int MIN_COMPARISON_WORDS = 10;
+
+    private boolean tooSmallToScore(Set<String> sourceWords) {
+        return sourceWords.size() < MIN_COMPARISON_WORDS;
     }
 
     private double round(double v) {
