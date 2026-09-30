@@ -47,17 +47,26 @@ def load_models():
             GPT2TokenizerFast,
         )
 
-        try:
-            roberta_name = "Hello-SimpleAI/chatgpt-detector-roberta"
-            _models["roberta_tok"] = AutoTokenizer.from_pretrained(roberta_name)
-            _models["roberta"] = AutoModelForSequenceClassification.from_pretrained(
-                roberta_name, low_cpu_mem_usage=True
-            )
-            _models["roberta"].eval()
-        except Exception as e:
-            app.logger.warning("RoBERTa unavailable, dropping that signal: %s", e)
+        # Same reasoning as ENABLE_GPT2 below: on a memory-constrained host,
+        # RoBERTa-base's ~500MB of fp32 weights alone can exceed the
+        # container's total RAM once Python/torch/gunicorn overhead is
+        # included, triggering an OOM kill that try/except cannot catch.
+        if os.environ.get("ENABLE_ROBERTA", "true").lower() == "false":
+            app.logger.info("RoBERTa disabled via ENABLE_ROBERTA=false")
             _models["roberta"] = None
             _models["roberta_tok"] = None
+        else:
+            try:
+                roberta_name = "Hello-SimpleAI/chatgpt-detector-roberta"
+                _models["roberta_tok"] = AutoTokenizer.from_pretrained(roberta_name)
+                _models["roberta"] = AutoModelForSequenceClassification.from_pretrained(
+                    roberta_name, low_cpu_mem_usage=True
+                )
+                _models["roberta"].eval()
+            except Exception as e:
+                app.logger.warning("RoBERTa unavailable, dropping that signal: %s", e)
+                _models["roberta"] = None
+                _models["roberta_tok"] = None
 
         # On memory-constrained hosts (e.g. a 512MB free tier), loading both
         # RoBERTa and GPT-2 in the same process risks an OOM kill - which is
