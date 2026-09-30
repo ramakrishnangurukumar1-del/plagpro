@@ -50,21 +50,34 @@ def load_models():
         try:
             roberta_name = "Hello-SimpleAI/chatgpt-detector-roberta"
             _models["roberta_tok"] = AutoTokenizer.from_pretrained(roberta_name)
-            _models["roberta"] = AutoModelForSequenceClassification.from_pretrained(roberta_name)
+            _models["roberta"] = AutoModelForSequenceClassification.from_pretrained(
+                roberta_name, low_cpu_mem_usage=True
+            )
             _models["roberta"].eval()
         except Exception as e:
             app.logger.warning("RoBERTa unavailable, dropping that signal: %s", e)
             _models["roberta"] = None
             _models["roberta_tok"] = None
 
-        try:
-            _models["gpt2_tok"] = GPT2TokenizerFast.from_pretrained("gpt2")
-            _models["gpt2"] = GPT2LMHeadModel.from_pretrained("gpt2")
-            _models["gpt2"].eval()
-        except Exception as e:
-            app.logger.warning("GPT-2 unavailable, dropping that signal: %s", e)
+        # On memory-constrained hosts (e.g. a 512MB free tier), loading both
+        # RoBERTa and GPT-2 in the same process risks an OOM kill - which is
+        # a SIGKILL from the OS, not a catchable Python exception, so no
+        # amount of try/except here saves it. ENABLE_GPT2=false lets a
+        # constrained deployment skip GPT-2 entirely and keep RoBERTa (the
+        # primary signal) working reliably instead of crashing the process.
+        if os.environ.get("ENABLE_GPT2", "true").lower() == "false":
+            app.logger.info("GPT-2 disabled via ENABLE_GPT2=false")
             _models["gpt2"] = None
             _models["gpt2_tok"] = None
+        else:
+            try:
+                _models["gpt2_tok"] = GPT2TokenizerFast.from_pretrained("gpt2")
+                _models["gpt2"] = GPT2LMHeadModel.from_pretrained("gpt2")
+                _models["gpt2"].eval()
+            except Exception as e:
+                app.logger.warning("GPT-2 unavailable, dropping that signal: %s", e)
+                _models["gpt2"] = None
+                _models["gpt2_tok"] = None
 
         _models["loaded"] = True
 
