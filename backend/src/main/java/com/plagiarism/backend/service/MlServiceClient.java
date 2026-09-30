@@ -31,29 +31,46 @@ public class MlServiceClient implements AIAnalyzer {
     @Override
     public AiAnalysisResult analyze(String text) {
         try {
-            MlResponse response = restClient.post()
-                    .uri("/analyze")
-                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                    .body(Map.of("text", text))
-                    .retrieve()
-                    .body(MlResponse.class);
-
-            if (response == null) {
+            return callOnce(text);
+        } catch (Exception e) {
+            // The ML service runs on the same free hosting tier as the
+            // backend and spins down independently after idle time. A sleeping
+            // service fails this call outright (connection refused/reset)
+            // before it's had time to wake up - one retry after a short delay
+            // is usually enough for it to be up. Without this, a cold ML
+            // service silently produced a fake "0% AI, no model scores"
+            // result via fallback() below, indistinguishable from a document
+            // genuinely showing no AI-writing signal.
+            try {
+                Thread.sleep(8000);
+                return callOnce(text);
+            } catch (Exception retryFailure) {
                 return fallback();
             }
+        }
+    }
 
-            List<ModelScoreDto> scores = response.modelScores() == null
-                    ? List.of()
-                    : response.modelScores().stream().map(s -> new ModelScoreDto(s.name(), s.score())).toList();
+    private AiAnalysisResult callOnce(String text) {
+        MlResponse response = restClient.post()
+                .uri("/analyze")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(Map.of("text", text))
+                .retrieve()
+                .body(MlResponse.class);
 
-            List<SentenceScoreDto> sentences = response.sentenceScores() == null
-                    ? List.of()
-                    : response.sentenceScores().stream().map(s -> new SentenceScoreDto(s.text(), s.aiScore())).toList();
-
-            return new AiAnalysisResult(response.aiPercent(), scores, sentences);
-        } catch (Exception e) {
+        if (response == null) {
             return fallback();
         }
+
+        List<ModelScoreDto> scores = response.modelScores() == null
+                ? List.of()
+                : response.modelScores().stream().map(s -> new ModelScoreDto(s.name(), s.score())).toList();
+
+        List<SentenceScoreDto> sentences = response.sentenceScores() == null
+                ? List.of()
+                : response.sentenceScores().stream().map(s -> new SentenceScoreDto(s.text(), s.aiScore())).toList();
+
+        return new AiAnalysisResult(response.aiPercent(), scores, sentences);
     }
 
     private AiAnalysisResult fallback() {
