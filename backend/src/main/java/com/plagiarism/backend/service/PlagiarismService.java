@@ -112,7 +112,7 @@ public class PlagiarismService {
             String url = doi.isBlank() ? first.path("URL").asText("") : "https://doi.org/" + doi;
             String abstractText = first.path("abstract").asText("").replaceAll("<[^>]+>", "");
             Set<String> sourceWords = significantWords(title + " " + abstractText);
-            return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, significantWords(title))), url,
+            return new SourceMatchDto("CrossRef", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("CrossRef check failed: {}", e.getMessage());
@@ -131,7 +131,7 @@ public class PlagiarismService {
             String title = first.path("title").asText("");
             String url = first.path("doi").asText(first.path("id").asText(""));
             Set<String> sourceWords = significantWords(title + " " + abstractFromInvertedIndex(first.path("abstract_inverted_index")));
-            return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, significantWords(title))), url,
+            return new SourceMatchDto("OpenAlex", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("OpenAlex check failed: {}", e.getMessage());
@@ -163,7 +163,7 @@ public class PlagiarismService {
             }
 
             Set<String> sourceWords = significantWords(title + " " + abstractText);
-            return new SourceMatchDto("DOAJ", round(overlapPercent(docWords, significantWords(title))), url,
+            return new SourceMatchDto("DOAJ", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("DOAJ check failed: {}", e.getMessage());
@@ -186,7 +186,7 @@ public class PlagiarismService {
                     ? "https://europepmc.org/article/" + first.path("source").asText("MED") + "/" + first.path("id").asText("")
                     : "https://doi.org/" + doi;
             Set<String> sourceWords = significantWords(title + " " + abstractText);
-            return new SourceMatchDto("Europe PMC", round(overlapPercent(docWords, significantWords(title))), url,
+            return new SourceMatchDto("Europe PMC", round(overlapPercent(docWords, sourceWords)), url,
                     topMatchingSentences(sentences, sourceWords));
         } catch (Exception e) {
             log.debug("Europe PMC check failed: {}", e.getMessage());
